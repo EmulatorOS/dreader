@@ -1,5 +1,5 @@
 /**
- * @file entity.class.js
+ * @file input.class.js
  * @version 1.1.0
  * @license MIT License
  * Copyright 2020 Donitz
@@ -20,72 +20,112 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import Options from '../core/options.class.js';
-
-export default class Entity {
+export default class Input {
     static _init() {
-        if (this !== Entity) {
-            throw new Error('Static _init called from wrong class');
+        Input._mouseButtonDown = new Set();
+        Input._mouseButtonUp = new Set();
+        Input._mouseButton = new Set();
+
+        Input._cursorPosition = { x: 0, y: 0 };
+
+        Input._newCursorStyle = null;
+
+        Input._enableContextMenu = true;
+
+        window.addEventListener('load', Input._handleLoad);
+    }
+
+    static _handleLoad() {
+        const cursorMove = (x, y) => {
+            Input._cursorPosition.x = x;
+            Input._cursorPosition.y = y;
+        };
+
+        document.addEventListener('mousedown', e => {
+            Input._mouseButtonDown.add(e.button);
+            Input._mouseButton.add(e.button);
+        }, false);
+
+        document.addEventListener('mouseup', e => {
+            Input._mouseButtonUp.add(e.button);
+            Input._mouseButton.delete(e.button);
+        }, false);
+
+        document.addEventListener('mousemove', e => {
+            cursorMove(e.clientX, e.clientY);
+        }, false);
+
+        document.addEventListener('touchstart', e => {
+            Input._mouseButtonDown.add(0);
+            Input._mouseButton.add(0);
+
+            cursorMove(e.touches[0].clientX, e.touches[0].clientY);
+
+            e.preventDefault();
+        }, false);
+
+        document.addEventListener('touchend', e => {
+            Input._mouseButtonUp.add(0);
+            Input._mouseButton.delete(0);
+        }, false);
+
+        document.addEventListener('touchcancel', () => {
+            Input._mouseButtonUp.add(0);
+            Input._mouseButton.delete(0);
+        }, false);
+
+        document.addEventListener('touchmove', e => {
+            cursorMove(e.touches[0].clientX, e.touches[0].clientY);
+        }, false);
+
+        document.addEventListener('contextmenu', e => {
+            if (!Input._enableContextMenu) {
+                e.preventDefault();
+            }
+        }, false);
+    }
+
+    static getMouseButtonDown(button = 0) {
+        return Input._mouseButtonDown.has(button);
+    }
+
+    static getMouseButtonUp(button = 0) {
+        return Input._mouseButtonUp.has(button);
+    }
+
+    static getMouseButton(button = 0) {
+        return Input._mouseButton.has(button);
+    }
+
+    static getCursorPosition(target) {
+        if (target === undefined) {
+            throw new Error('No target object supplied (target = { x, y })');
         }
 
-        Entity._typeByName = new Map();
+        target.x = Input._cursorPosition.x;
+        target.y = Input._cursorPosition.y;
+        return target;
     }
 
-    constructor(context, scene, options) {
-        options = Options.castIfRequired(options);
-
-        this._scene = scene;
-
-        this._destroyed = false;
-
-        this._updatePriority = options.get('updatePriority', 0);
-
-        scene.addEntity(this);
+    static setCursorStyle(style = 'auto') {
+        Input._newCursorStyle = style;
     }
 
-    getScene() {
-        return this._scene;
+    static setContextMenuEnabled(enabled) {
+        Input._enableContextMenu = enabled;
     }
 
-    getDestroyed() {
-        return this._destroyed;
-    }
+    static resetState() {
+        Input._mouseButtonDown.clear();
+        Input._mouseButtonUp.clear();
 
-    destroy(context) {
-        if (this._destroyed) {
-            throw new Error('Entity has already been destroyed');
+        if (Input._newCursorStyle !== null) {
+            if (document.body.style.cursor !== Input._newCursorStyle) {
+                document.body.style.cursor = Input._newCursorStyle;
+            }
+            Input._newCursorStyle = null;
         }
-
-        this._destroyed = true;
-
-        this._scene.removeEntity(this);
-    }
-
-    handleResize(context) {
-    }
-
-    update(context) {
-    }
-
-    static p_register() {
-        Entity._typeByName.set(this.name, this);
-    }
-
-    static createByName(name, context, scene, options) {
-        return new (Entity.getTypeByName(name))(context, scene, options);
-    }
-
-    static getTypeByName(name) {
-        const type = Entity._typeByName.get(name);
-        if (type === undefined) {
-            throw new Error(`Entity type "${name}" has not been registered`);
-        }
-        return type;
-    }
-
-    static updatePrioritySortFunc(a, b) {
-        return b._updatePriority - a._updatePriority;
     }
 }
 
-Entity._init();
+Input._init();
